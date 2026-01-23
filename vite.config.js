@@ -1,0 +1,42 @@
+/*
+ * @Author: 2409479323@qq.com
+ * @Date: 2026-01-15 18:06:48
+ * @LastEditors: 2409479323@qq.com 
+ * @LastEditTime: 2026-01-16 13:45:34
+ * @FilePath: \RammedEarth\vite.config.js
+ * @Description: 
+ * 
+ * Copyright (c) 2026 by bimcc, All Rights Reserved. 
+ */
+import { defineConfig } from 'vite';
+import { resolve } from 'path';
+
+// Vite配置
+export default defineConfig({
+    // 开发服务器配置
+    server: {
+        host: '0.0.0.0', // 允许局域网访问
+        open: '/index.html', // 自动打开演示页面
+        https: false
+    },
+    
+    // 构建配置
+    build: {
+        lib: {
+            entry: resolve(__dirname, 'src/index.js'),
+            name: 'LocalTerrainScene',
+            fileName: (format) => {
+                if (format === 'es') {
+                    return 'LocalTerrainScene.mjs';
+                } else if (format === 'umd') {
+                    return 'LocalTerrainScene.umd.js';
+                }
+                return `LocalTerrainScene.${format}.js`;
+            },
+            formats: ['es', 'umd'] // 输出ES和UMD格式
+        },
+        outDir: 'dist',
+        emptyOutDir: true,
+        sourcemap: true
+    }
+});
