@@ -1,0 +1,41 @@
+/**
+ * Shared distance->zoom mapping (from `src/camera/camera.md`).
+ * Zoom is an integer where larger means more detail.
+ *
+ * Note: callers should clamp to their own min/max zoom bounds.
+ */
+export function getZoomLevelByDistance(distanceMeters) {
+    const d = Math.max(0, Number(distanceMeters) || 0);
+    if (d <= 100) return 18;
+    if (d <= 300) return 18;
+    if (d <= 660) return 17;
+    if (d <= 1300) return 16;
+    if (d <= 2600) return 15;
+    if (d <= 6400) return 14;
+    if (d <= 13200) return 13;
+    if (d <= 26000) return 12;
+    if (d <= 67985) return 11;
+    if (d <= 139780) return 10;
+    if (d <= 250600) return 9;
+    if (d <= 380000) return 8;
+    if (d <= 640000) return 7;
+    if (d <= 1280000) return 6;
+    if (d <= 2600000) return 5;
+    if (d <= 6100000) return 4;
+    if (d <= 11900000) return 3;
+    return 2;
+}
+
+export function clampZoom(z, minZ, maxZ) {
+    const zz = Number(z);
+    const lo = Number.isFinite(minZ) ? minZ : -Infinity;
+    const hi = Number.isFinite(maxZ) ? maxZ : Infinity;
+    if (!Number.isFinite(zz)) return Math.max(lo, Math.min(hi, 0));
+    return Math.max(lo, Math.min(hi, zz));
+}
+
+export function getZoomLevelWithBias(distanceMeters, options = {}) {
+    const base = getZoomLevelByDistance(distanceMeters);
+    const bias = Number.isFinite(options.bias) ? options.bias : 0;
+    return clampZoom(base + bias, options.minZ, options.maxZ);
+}

@@ -2,8 +2,8 @@
  * @Author: 2409479323@qq.com
  * @Date: 2026-01-15 18:06:48
  * @LastEditors: 2409479323@qq.com 
- * @LastEditTime: 2026-01-16 13:45:34
- * @FilePath: \RammedEarth\vite.config.js
+ * @LastEditTime: 2026-01-26 11:26:59
+ * @FilePath: \THREEMapT\vite.config.js
  * @Description: 
  * 
  * Copyright (c) 2026 by bimcc, All Rights Reserved. 
