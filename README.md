@@ -8,7 +8,7 @@
  * 
  * Copyright (c) 2026 by bimcc, All Rights Reserved. 
 -->
-# ThreeMap（局部地形 / 填挖方 / 地形修整验证）
+# ThreeGIS（局部地形 / 填挖方 / 地形修整验证）
 
 基于 **Three.js + Vite** 的局部 3D 地理场景 Demo：加载 **terrain-rgb 高程瓦片**，并在地形材质上铺设 **栅格底图/影像瓦片（XYZ/TMS）**；提供测量、绘制、填挖方、剖面、地形修整（抬高/降低/整平/坡面/裁剪）等交互工具。
 

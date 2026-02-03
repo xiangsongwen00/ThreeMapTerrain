@@ -10,6 +10,7 @@ import { DrawToolUI } from './UI/drawToolUI.js';
 import { AuxiliaryToolsUI } from './UI/auxiliaryToolsUI.js';
 import { TestToolsUI } from './UI/testToolsUI.js';
 import { TerrainEditorUI } from './UI/terrainEditorUI.js';
+import { IMG } from '../assets/img/urls.js';
 
 /**
  * 工具管理器，用于管理所有工具的状态、UI和交互
@@ -121,56 +122,56 @@ export class ToolManager {
             {
                 id: 'terrainToggle',
                 name: '地形开关',
-                icon: './src/assest/img/toolLog/地形.png',
+                icon: IMG.toolLog.terrain,
                 description: '切换地形高程/平面(高程为0)',
                 hasUI: false
             },
             {
                 id: 'axesToggle',
                 name: '坐标轴显隐',
-                icon: './src/assest/img/toolLog/坐标轴.png',
+                icon: IMG.toolLog.axes,
                 description: '切换坐标轴和瓦片网格显示/隐藏',
                 hasUI: true
             },
             {
                 id: 'drawTool',
                 name: '绘制工具',
-                icon: './src/assest/img/toolLog/绘制.png',
+                icon: IMG.toolLog.draw,
                 description: '场景点线面绘制',
                 hasUI: true
             },
             {
                 id: 'measureTool',
                 name: '测量工具',
-                icon: './src/assest/img/toolLog/测量.png',
+                icon: IMG.toolLog.measure,
                 description: '测量距离和面积',
                 hasUI: true
             },
             {
                 id: 'animationControl',
                 name: '动画控制',
-                icon: './src/assest/img/toolLog/动画.png',
+                icon: IMG.toolLog.animation,
                 description: '控制模型动画播放',
                 hasUI: true
             },
             {
                 id: 'infoManager',
                 name: '信息管理',
-                icon: './src/assest/img/toolLog/信息.png',
+                icon: IMG.toolLog.info,
                 description: '查看和下载场景信息',
                 hasUI: true
             },
             {
                 id: 'terrainEditor',
                 name: '地形修整',
-                icon: './src/assest/img/toolLog/地形修整.png',
+                icon: IMG.toolLog.terrainEdit,
                 description: '抬升/整平/裁剪（挖洞）',
                 hasUI: true
             },
             {
                 id: 'testTools',
                 name: '测试工具',
-                icon: './src/assest/img/toolLog/测试.png',
+                icon: IMG.toolLog.test,
                 description: '距离验证、坐标转换调试等测试工具',
                 hasUI: true
             }

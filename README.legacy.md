@@ -1,7 +1,7 @@
 # (Legacy) Three-Map-Terrain
 
-## 介绍
-Three.js 地图地形渲染库，专注于局部3D地理场景，支持卫星地图和地形瓦片加载，提供完整的坐标转换、高程查询、模型加载和动画控制功能。
+## TGIS介绍
+基于Three.js 地图地形渲染库，专注于局部3D地理场景，支持卫星地图和地形瓦片加载，提供完整的坐标转换、高程查询、模型加载和动画控制功能。
 
 ## 核心业务逻辑
 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EEEE

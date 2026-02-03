@@ -24,14 +24,14 @@ export default defineConfig({
     build: {
         lib: {
             entry: resolve(__dirname, 'src/viewer.js'),
-            name: 'ThreeMap',
+            name: 'TGIS',
             fileName: (format) => {
                 if (format === 'es') {
-                    return 'ThreeMap.mjs';
+                    return 'TGIS.mjs';
                 } else if (format === 'umd') {
-                    return 'ThreeMap.umd.js';
+                    return 'TGIS.umd.js';
                 }
-                return `ThreeMap.${format}.js`;
+                return `TGIS.${format}.js`;
             },
             formats: ['es', 'umd'] // 输出ES和UMD格式
         },

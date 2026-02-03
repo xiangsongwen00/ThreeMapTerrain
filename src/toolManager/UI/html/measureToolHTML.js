@@ -2,6 +2,8 @@
  * 测量工具HTML模板
  * 负责导出测量工具的HTML布局
  */
+import { IMG } from '../../../assets/img/urls.js';
+
 export const measureToolHTML = `
     <div class="measure-tool-ui">
 
@@ -11,37 +13,37 @@ export const measureToolHTML = `
                 <ul class="measure-tabs">
                     <li class="tab-item">
                         <a href="#" id="pointMeasureBtn" class="tab-link active">
-                            <img src="./src/assest/img/measureImg/坐标点.png" alt="点测量" class="tab-icon">
+                            <img src="${IMG.measure.point}" alt="点测量" class="tab-icon">
                             <span class="tab-tooltip">点测量</span>
                         </a>
                     </li>
                     <li class="tab-item">
                         <a href="#" id="distanceMeasureBtn" class="tab-link">
-                            <img src="./src/assest/img/measureImg/距离测量.png" alt="距离测量" class="tab-icon">
+                            <img src="${IMG.measure.distance}" alt="距离测量" class="tab-icon">
                             <span class="tab-tooltip">距离测量</span>
                         </a>
                     </li>
                     <li class="tab-item">
                         <a href="#" id="multiDistanceBtn" class="tab-link">
-                            <img src="./src/assest/img/measureImg/路程.png" alt="多点路程" class="tab-icon">
+                            <img src="${IMG.measure.multiDistance}" alt="多点路程" class="tab-icon">
                             <span class="tab-tooltip">多点路程</span>
                         </a>
                     </li>
                     <li class="tab-item">
                         <a href="#" id="areaMeasureBtn" class="tab-link">
-                            <img src="./src/assest/img/measureImg/面积.png" alt="面积测量" class="tab-icon">
+                            <img src="${IMG.measure.area}" alt="面积测量" class="tab-icon">
                             <span class="tab-tooltip">面积测量</span>
                         </a>
                     </li>
                     <li class="tab-item">
                         <a href="#" id="cutFillBtn" class="tab-link">
-                            <img src="./src/assest/img/measureImg/填挖方.png" alt="填挖方测量" class="tab-icon">
+                            <img src="${IMG.measure.cutFill}" alt="填挖方测量" class="tab-icon">
                             <span class="tab-tooltip">填挖方测量</span>
                         </a>
                     </li>
                     <li class="tab-item">
                         <a href="#" id="profileAnalysisBtn" class="tab-link">
-                            <img src="./src/assest/img/measureImg/剖面分析.png" alt="剖面分析" class="tab-icon">
+                            <img src="${IMG.measure.profile}" alt="剖面分析" class="tab-icon">
                             <span class="tab-tooltip">剖面分析</span>
                         </a>
                     </li>

@@ -3,6 +3,7 @@ import { measureToolHTML } from './html/measureToolHTML.js';
 import { measureToolStyles } from './style/measureToolStyles.js';
 import { MeasureMath } from '../measureMath.js';
 import { CustomTerrainSurface } from '../../terrain/CustomTerrainSurface.js';
+import { IMG } from '../../assets/img/urls.js';
 /**
  * 测量工具UI类
  * 负责测量工具的UI设计与数据更新
@@ -533,7 +534,7 @@ export class MeasureToolUI {
                     radius: 1,
                     color: 0xff0000,
                     label: `P${this.cutFillCurrentPoints.length}`,
-                    img: './src/assest/img/pointImg/点.png'
+                    img: IMG.point.point
                 });
                 this.cutFillCurrentMarkerIds.push(markerId);
             } catch {
@@ -1507,7 +1508,7 @@ export class MeasureToolUI {
                 radius: 1,
                 color: 0xff0000,
                 label: `P${this.pickedPoints.length}`,
-                img: './src/assest/img/pointImg/点.png' // 添加图片标签
+                img: IMG.point.point // 添加图片标签
             });
             this.markers.push(markerId);
         }

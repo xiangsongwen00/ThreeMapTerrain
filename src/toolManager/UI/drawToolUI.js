@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { drawToolHTML } from './html/drawToolHTML.js';
 import { drawToolStyles } from './style/drawToolStyles.js';
 import { DrawTool } from '../../drawTool/DrawTool.js';
+import { IMG } from '../../assets/img/urls.js';
 
 /**
  * 绘制工具UI类
@@ -717,27 +718,27 @@ export class DrawToolUI {
         switch (this.currentDrawMode) {
             case 'point':
                 // 点模式：所有点采用同一张图片
-                imgPath = './src/assest/img/pointImg/点.png';
+                imgPath = IMG.point.point;
                 break;
             case 'line':
                 // 线模式：只关注起点和终点
                 if (totalPoints === 1) {
                     // 起点
-                    imgPath = './src/assest/img/pointImg/起点.png';
+                    imgPath = IMG.point.start;
                 } else if (this.isDrawing) {
                     // 绘制中，只绘制起点，中间点不标记
                     return; // 中间点不标记，直接返回
                 } else {
                     // 绘制结束，标记终点
-                    imgPath = './src/assest/img/pointImg/终点.png';
+                    imgPath = IMG.point.end;
                 }
                 break;
             case 'area':
                 // 面模式：所有顶点保持同一个图标
-                imgPath = './src/assest/img/pointImg/点.png';
+                imgPath = IMG.point.point;
                 break;
             default:
-                imgPath = './src/assest/img/pointImg/点.png';
+                imgPath = IMG.point.point;
         }
         
         if (this.isGroundDrawing) {
@@ -773,16 +774,16 @@ export class DrawToolUI {
             switch (this.currentDrawMode) {
                 case 'point':
                     // 点模式：所有点采用同一张图片
-                    imgPath = './src/assest/img/pointImg/点.png';
+                    imgPath = IMG.point.point;
                     break;
                 case 'line':
                     // 线模式：只关注起点和终点，中间点不标记
                     if (i === 0) {
                         // 起点
-                        imgPath = './src/assest/img/pointImg/起点.png';
+                        imgPath = IMG.point.start;
                     } else if (i === totalPoints - 1) {
                         // 终点
-                        imgPath = './src/assest/img/pointImg/终点.png';
+                        imgPath = IMG.point.end;
                     } else {
                         // 中间点不标记
                         continue;
@@ -790,10 +791,10 @@ export class DrawToolUI {
                     break;
                 case 'area':
                     // 面模式：所有顶点保持同一个图标
-                    imgPath = './src/assest/img/pointImg/点.png';
+                    imgPath = IMG.point.point;
                     break;
                 default:
-                    imgPath = './src/assest/img/pointImg/点.png';
+                    imgPath = IMG.point.point;
             }
             
             if (this.isGroundDrawing) {

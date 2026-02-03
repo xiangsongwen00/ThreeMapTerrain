@@ -9,6 +9,7 @@
  * Copyright (c) 2026 by bimcc, All Rights Reserved. 
  */
 import * as THREE from 'three';
+import { IMG } from '../assets/img/urls.js';
 
 /**
  * 点标记工具类
@@ -177,7 +178,7 @@ export class MarkerManager {
         };
         
         // 加载图片
-        img.src = './src/assest/img/pointImg/点.png';
+        img.src = IMG.point.point;
     }
 
     /**
