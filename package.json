@@ -13,8 +13,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "dat.gui": "^0.7.9",
-    "earcut": "^3.0.2",
+    "@turf/turf": "^7.3.2",
     "three": "^0.182.0"
   },
   "devDependencies": {

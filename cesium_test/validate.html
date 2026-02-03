@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8">
+    <title>Cesium 地形与贴地多边形</title>
+    <!-- 引入CesiumJS 1.130 -->
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.130/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.130/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <style>
+        html,
+        body,
+        #cesiumContainer {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="cesiumContainer"></div>
+    <script>
+
+        // 异步创建地形提供者
+        async function init() {
+            try {
+                Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI0NDg5YzJjZC1lNjcxLTQ5ZGItYjI5Zi02OGM1ZjAyNTEyYjIiLCJpZCI6MTc3MzcwLCJpYXQiOjE2OTk2MDQzMzV9.Xfjh4USVk2BoxCQy21Fy-pV9Lj0c_hSKc8_ZJ3qIdJg";
+                // 创建世界地形
+                const terrainProvider = await Cesium.createWorldTerrainAsync({
+                    requestWaterMask: true,   // 请求水掩膜
+                    requestVertexNormals: true // 请求顶点法线
+                });
+
+                // 初始化Viewer实例，加载地形
+                const viewer = new Cesium.Viewer('cesiumContainer', {
+                    terrainProvider: terrainProvider,
+                    baseLayerPicker: false,     // 隐藏底图切换按钮
+                    timeline: false,            // 隐藏时间轴
+                    animation: false,           // 隐藏动画控件
+                    homeButton: false,          // 隐藏首页按钮
+                    fullscreenButton: true      // 显示全屏按钮
+                });
+
+                // 定义多边形的经纬度坐标
+                const positions = Cesium.Cartesian3.fromDegreesArray([
+                    105.290, 28.835,
+                    105.298, 28.835,
+                    105.310, 28.839,
+                    105.298, 28.843,
+                    105.294, 28.849,
+                    105.290, 28.843
+                ]
+                );
+
+                // 添加贴地多边形实体
+                const polygonEntity = viewer.entities.add({
+                    name: '贴地红多边形',
+                    polygon: {
+                        hierarchy: new Cesium.PolygonHierarchy(positions),
+                        material: Cesium.Color.RED.withAlpha(0.6), // 设置颜色
+                        // 关键：启用贴地模式
+                        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                    }
+                });
+
+                // 等待场景渲染完所有实体，然后缩放到多边形
+                viewer.zoomTo(viewer.entities).then(() => {
+                    console.log('已缩放到多边形');
+                    // 如果需要调整俯视角度等，可以在这里添加camera操作
+                });
+
+                // 启用帧率显示（可选）
+                viewer.scene.debugShowFramesPerSecond = true;
+
+                // 返回viewer实例（可选，方便后续操作）
+                return viewer;
+
+            } catch (error) {
+                console.error('初始化Cesium失败:', error);
+            }
+        }
+
+        // 调用异步函数
+        init();
+    </script>
+</body>
+
+</html>
