@@ -81,6 +81,7 @@ export class TerrainMapAtlas {
             shader.uniforms.uMapAtlasInvCell18 = { value: 0 };
             shader.uniforms.uMapAtlasSmoothness = { value: 0 };
             shader.uniforms.uMapAtlasSmoothRadiusPx = { value: 1 };
+            shader.uniforms.uSceneMetersPerUnit = { value: 1 };
 
             material.userData.mapAtlasUniforms = shader.uniforms;
 
@@ -104,13 +105,14 @@ uniform vec2 uMapAtlasOriginLocal15;
 uniform vec2 uMapAtlasOriginLocal16;
 uniform vec2 uMapAtlasOriginLocal17;
 uniform vec2 uMapAtlasOriginLocal18;
-uniform float uMapAtlasInvCell15;
-uniform float uMapAtlasInvCell16;
-uniform float uMapAtlasInvCell17;
-uniform float uMapAtlasInvCell18;
-uniform float uMapAtlasSmoothness;
-uniform float uMapAtlasSmoothRadiusPx;
-varying vec3 ${varyName};
+ uniform float uMapAtlasInvCell15;
+ uniform float uMapAtlasInvCell16;
+ uniform float uMapAtlasInvCell17;
+ uniform float uMapAtlasInvCell18;
+ uniform float uMapAtlasSmoothness;
+ uniform float uMapAtlasSmoothRadiusPx;
+ uniform float uSceneMetersPerUnit;
+ varying vec3 ${varyName};
 
 const float MAP_ATLAS_PI = 3.1415926535897932384626433832795;
 const float MAP_ATLAS_R = 6378137.0;
@@ -130,8 +132,10 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
     // in 32-bit floats and causes blocky intra-tile UVs.
     // Instead compute in local-mercator meters relative to the atlas grid origin so the working numbers stay small.
     float tileSizeMeters = MAP_ATLAS_WORLD * exp2(-z);
-    float tx = (wpos.x - originLocal.x) / tileSizeMeters;
-    float ty = (originLocal.y + wpos.z) / tileSizeMeters;
+    float mx = wpos.x * uSceneMetersPerUnit;
+    float mz = wpos.z * uSceneMetersPerUnit;
+    float tx = (mx - originLocal.x) / tileSizeMeters;
+    float ty = (originLocal.y + mz) / tileSizeMeters;
 
     float dx = floor(tx);
     float dy = floor(ty);
@@ -273,6 +277,9 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
 
     update(camera) {
         const cfg = this.terrain?.config || {};
+        const proj = this.terrain?.proj;
+        const toUnits = (v) => (proj?.metersToUnits ? proj.metersToUnits(v) : Number(v));
+        const toMeters = (v) => (proj?.unitsToMeters ? proj.unitsToMeters(v) : Number(v));
         const enabled = cfg.mapDrapeShaderPatchEnabled === true;
         if (!enabled) {
             if (this._state?.byZoom?.size) this.clear();
@@ -294,12 +301,12 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
 
         const atlas = this._state;
 
-        const proj = this.terrain?.proj;
         const camMerc = proj?.threeToMercator?.(camera.position) ?? null;
         const groundHeightAtCam = (camMerc && Number.isFinite(camMerc.x) && Number.isFinite(camMerc.y))
             ? (this.terrain?.getElevationAtMercator?.(camMerc.x, camMerc.y) ?? null)
             : (this.terrain?.sampleHeightAtWorld?.(camera.position.x, camera.position.z, 'heightmap') ?? null);
-        const cameraHeight = (Number(camera.position.y) - (Number.isFinite(groundHeightAtCam) ? Number(groundHeightAtCam) : 0));
+        const cameraHeightUnits = (Number(camera.position.y) - (Number.isFinite(groundHeightAtCam) ? Number(groundHeightAtCam) : 0));
+        const cameraHeight = toMeters(cameraHeightUnits);
 
         if (enableBelowOrEqualHeight !== null && cameraHeight > enableBelowOrEqualHeight) {
             if (atlas.byZoom.size) this.clear();
@@ -365,9 +372,10 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
             const planeBelowGroundCfg = Number.isFinite(cfg.mapDrapeViewportPlaneBelowGroundMeters)
                 ? Math.max(0, Number(cfg.mapDrapeViewportPlaneBelowGroundMeters))
                 : null;
-            const planeBelowGround = planeBelowGroundCfg !== null
+            const planeBelowGroundMeters = planeBelowGroundCfg !== null
                 ? planeBelowGroundCfg
                 : (Number.isFinite(cameraHeight) && cameraHeight > 0 ? Math.min(500, Math.max(0, cameraHeight * 0.25)) : 0);
+            const planeBelowGround = toUnits(planeBelowGroundMeters);
             const planeY = (Number.isFinite(groundHeightAtCam) ? Number(groundHeightAtCam) : 0) - planeBelowGround;
 
             // Raycast to terrain if possible, fall back to a horizontal plane otherwise.
@@ -402,7 +410,8 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
             };
 
             const centerHit = _groundHitAtNdc(0, 0);
-            const centerDist = (centerHit && centerHit.isVector3) ? camera.position.distanceTo(centerHit) : null;
+            const centerDistUnits = (centerHit && centerHit.isVector3) ? camera.position.distanceTo(centerHit) : null;
+            const centerDist = (Number.isFinite(centerDistUnits) ? toMeters(centerDistUnits) : null);
 
             // Auto cap on top zoom: use the camera->terrain intersection distance (not just height).
             const topZoomByView = (() => {
@@ -411,7 +420,8 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
 
                 let metersPerPixel = null;
                 if (camera?.isOrthographicCamera === true) {
-                    const frustumH = Math.abs(Number(camera.top) - Number(camera.bottom));
+                    const frustumHUnits = Math.abs(Number(camera.top) - Number(camera.bottom));
+                    const frustumH = toMeters(frustumHUnits);
                     if (Number.isFinite(frustumH) && frustumH > 0) metersPerPixel = frustumH / viewportH;
                 } else {
                     const fovRad = THREE.MathUtils.degToRad(Number(camera?.fov) || 0);
@@ -485,8 +495,8 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
                 for (const [nx, ny] of ndc) {
                     const p = _groundHitAtNdc(nx, ny);
                     if (!p) continue;
-                    const mx = proj.centerMercator.x + p.x;
-                    const my = proj.centerMercator.y - p.z;
+                    const mx = proj.centerMercator.x + toMeters(p.x);
+                    const my = proj.centerMercator.y - toMeters(p.z);
                     if (!Number.isFinite(mx) || !Number.isFinite(my)) continue;
                     mercPts.push({ x: mx, y: my });
                 }
@@ -571,7 +581,8 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
                 const d = Math.max(1, Number(distMeters) || 1);
                 let metersPerPixel = null;
                 if (camera?.isOrthographicCamera === true) {
-                    const frustumH = Math.abs(Number(camera.top) - Number(camera.bottom));
+                    const frustumHUnits = Math.abs(Number(camera.top) - Number(camera.bottom));
+                    const frustumH = toMeters(frustumHUnits);
                     if (Number.isFinite(frustumH) && frustumH > 0) metersPerPixel = frustumH / viewportH;
                 } else {
                     const fovRad = THREE.MathUtils.degToRad(Number(camera?.fov) || 0);
@@ -595,16 +606,16 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
 
                 const mx = clamp(camMerc.x, west, east);
                 const my = clamp(camMerc.y, south, north);
-                const wx = mx - proj.centerMercator.x;
-                const wz = proj.centerMercator.y - my;
+                const wx = toUnits(mx - proj.centerMercator.x);
+                const wz = toUnits(proj.centerMercator.y - my);
                 const wy0 = this.terrain?.sampleHeightAtWorld?.(wx, wz, 'heightmap');
                 const wy = Number.isFinite(wy0) ? Number(wy0) : (Number.isFinite(groundHeightAtCam) ? Number(groundHeightAtCam) : 0);
 
                 const dx = wx - camera.position.x;
                 const dy = wy - camera.position.y;
                 const dz = wz - camera.position.z;
-                const d = Math.hypot(dx, dy, dz);
-                return Number.isFinite(d) ? d : Infinity;
+                const dUnits = Math.hypot(dx, dy, dz);
+                return Number.isFinite(dUnits) ? toMeters(dUnits) : Infinity;
             };
 
             // Build a view-trapezoid LOD set (tiles always cover the view; refinement uses true 3D distance).
@@ -968,7 +979,8 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
 
             let metersPerPixel = null;
             if (camera?.isOrthographicCamera === true) {
-                const frustumH = Math.abs(Number(camera.top) - Number(camera.bottom));
+                const frustumHUnits = Math.abs(Number(camera.top) - Number(camera.bottom));
+                const frustumH = toMeters(frustumHUnits);
                 if (Number.isFinite(frustumH) && frustumH > 0) metersPerPixel = frustumH / viewportH;
             } else {
                 const fovRad = THREE.MathUtils.degToRad(Number(camera?.fov) || 0);
@@ -1022,9 +1034,10 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
             const planeBelowGroundCfg = Number.isFinite(cfg.mapDrapeViewportPlaneBelowGroundMeters)
                 ? Math.max(0, Number(cfg.mapDrapeViewportPlaneBelowGroundMeters))
                 : null;
-            const planeBelowGround = planeBelowGroundCfg !== null
+            const planeBelowGroundMeters = planeBelowGroundCfg !== null
                 ? planeBelowGroundCfg
                 : (Number.isFinite(cameraHeight) && cameraHeight > 0 ? Math.min(500, Math.max(0, cameraHeight * 0.25)) : 0);
+            const planeBelowGround = toUnits(planeBelowGroundMeters);
 
             // Intersect screen-corner rays with a horizontal plane near (but slightly below) the camera ground height
             // to estimate the ground footprint of the view. Lowering the plane makes the bound more conservative
@@ -1050,8 +1063,8 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
                 const t = (planeY - pNear.y) / dy;
                 if (!Number.isFinite(t) || t <= 0) continue;
                 const p = pNear.add(dir.multiplyScalar(t));
-                const mx = proj.centerMercator.x + p.x;
-                const my = proj.centerMercator.y - p.z;
+                const mx = proj.centerMercator.x + toMeters(p.x);
+                const my = proj.centerMercator.y - toMeters(p.z);
                 if (!Number.isFinite(mx) || !Number.isFinite(my)) continue;
                 mercPts.push({ x: mx, y: my });
             }
@@ -1414,6 +1427,7 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
 
         const centerX = Number(this.terrain?.proj?.centerMercator?.x ?? 0);
         const centerY = Number(this.terrain?.proj?.centerMercator?.y ?? 0);
+        const metersPerUnit = Number(this.terrain?.proj?.metersPerUnit ?? 1) || 1;
 
         const z15 = this._state?.byZoom?.get?.(15) ?? null;
         const z16 = this._state?.byZoom?.get?.(16) ?? null;
@@ -1460,6 +1474,7 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
 
                 if (u.uMapAtlasEnabled) u.uMapAtlasEnabled.value = enabled ? 1 : 0;
                 if (u.uMapAtlasCenterMercator?.value?.set) u.uMapAtlasCenterMercator.value.set(centerX, centerY);
+                if (u.uSceneMetersPerUnit) u.uSceneMetersPerUnit.value = metersPerUnit;
 
                 if (u.uMapAtlasTex15) u.uMapAtlasTex15.value = enabled ? (z15?.rt?.texture ?? null) : null;
                 if (u.uMapAtlasTex16) u.uMapAtlasTex16.value = enabled ? (z16?.rt?.texture ?? null) : null;
@@ -1629,6 +1644,7 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
         const proj = this.terrain?.proj;
         if (!frustum || !boundsMerc?.min || !boundsMerc?.max || !proj?.centerMercator) return true;
 
+        const toUnits = (v) => (proj?.metersToUnits ? proj.metersToUnits(v) : Number(v));
         const cx = proj.centerMercator.x;
         const cy = proj.centerMercator.y;
         const west = boundsMerc.min.x;
@@ -1636,13 +1652,14 @@ vec4 sampleMapAtlas(in sampler2D tex, in vec4 grid, in vec2 originLocal, in floa
         const north = boundsMerc.min.y;
         const south = boundsMerc.max.y;
 
-        const xW = west - cx;
-        const xE = east - cx;
-        const zN = cy - north;
-        const zS = cy - south;
+        const xW = toUnits(west - cx);
+        const xE = toUnits(east - cx);
+        const zN = toUnits(cy - north);
+        const zS = toUnits(cy - south);
 
-        const y0 = Number.isFinite(yWorld) ? Math.min(-10000, yWorld - 10000) : -10000;
-        const y1 = Number.isFinite(yWorld) ? (yWorld + 10000) : 10000;
+        const yPad = toUnits(10000);
+        const y0 = Number.isFinite(yWorld) ? Math.min(-yPad, yWorld - yPad) : -yPad;
+        const y1 = Number.isFinite(yWorld) ? (yWorld + yPad) : yPad;
 
         const box = new THREE.Box3(
             new THREE.Vector3(Math.min(xW, xE), y0, Math.min(zN, zS)),

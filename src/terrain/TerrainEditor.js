@@ -15,11 +15,13 @@ export class TerrainEditor {
      */
     constructor(terrain) {
         this.terrain = terrain;
+        this._toUnits = (v) => this.terrain?.proj?.metersToUnits ? this.terrain.proj.metersToUnits(v) : Number(v);
+        this._toMeters = (v) => this.terrain?.proj?.unitsToMeters ? this.terrain.proj.unitsToMeters(v) : Number(v);
 
         // Patch visualization and state
         this.editPatchMeshes = new Map(); // key -> THREE.Group
         this.editPatchPolygonsXZ = new Map(); // key -> THREE.Vector2[] (for masking/clipping)
-        this.editPatchEpsilon = 0.002; // meters, avoid z-fighting while keeping patch tightly aligned
+        this.editPatchEpsilon = this._toUnits(0.002); // meters -> units, avoid z-fighting while keeping patch tightly aligned
         this.activeEditState = null; // { polygonKey, mode: 'delta'|'flatten'|'slope', value }
 
         // Outline helper
@@ -93,7 +95,7 @@ export class TerrainEditor {
 
         const polygonKey = JSON.stringify(polygonLonLat);
         // Delta is interpreted as an offset relative to the original/base surface (not cumulative stacking).
-        this.activeEditState = { polygonKey, mode: 'delta', value: delta };
+        this.activeEditState = { polygonKey, mode: 'delta', value: this._toUnits(delta) };
 
         const boundaryPolygonXZ = this._buildBoundaryXZ(polygonLonLat);
         this.showEditPolygon(boundaryPolygonXZ);
@@ -111,7 +113,7 @@ export class TerrainEditor {
         if (!this.terrain?.terrainGroup || this.terrain.terrainGroup.children.length === 0) return;
 
         const polygonKey = JSON.stringify(polygonLonLat);
-        this.activeEditState = { polygonKey, mode: 'flatten', value: targetElevation };
+        this.activeEditState = { polygonKey, mode: 'flatten', value: this._toUnits(targetElevation) };
 
         const boundaryPolygonXZ = this._buildBoundaryXZ(polygonLonLat);
         this.showEditPolygon(boundaryPolygonXZ);
@@ -182,7 +184,7 @@ export class TerrainEditor {
         const maxHeight = Number(options.maxHeight ?? 10);
 
         if (!Number.isFinite(widthHeightRatio) || !Number.isFinite(maxHeight)) return null;
-        const H = Math.abs(maxHeight);
+        const H = Math.abs(this._toUnits(maxHeight));
         const W = Math.abs(widthHeightRatio) * H;
         if (H <= 0 || W <= 0) return null;
 
@@ -274,7 +276,7 @@ export class TerrainEditor {
             // Drape the outline onto the actually rendered terrain surface (raycast),
             // then apply a tiny lift to avoid z-fighting.
             const y0 = this._raycastTerrainHeightAtWorld(p.x, p.y);
-            const y = (Number.isFinite(y0) ? y0 : this.terrain.sampleHeightAtWorld(p.x, p.y, 'heightmap')) + Math.max(0.0005, this.editPatchEpsilon);
+            const y = (Number.isFinite(y0) ? y0 : this.terrain.sampleHeightAtWorld(p.x, p.y, 'heightmap')) + Math.max(this._toUnits(0.0005), this.editPatchEpsilon);
             return new THREE.Vector3(p.x, y, p.y);
         });
 
@@ -390,7 +392,8 @@ export class TerrainEditor {
             const baseYj = wallPositions[baseJ * 3 + 1];
             const topYj = wallPositions[topJ * 3 + 1] - this.editPatchEpsilon;
             const d = ((topYi - baseYi) + (topYj - baseYj)) * 0.5;
-            const wallMinHeight = Number(this.terrain.tileConfig.wallMinHeight ?? 0.01);
+            const wallMinHeightMeters = Number(this.terrain.tileConfig.wallMinHeight ?? 0.01);
+            const wallMinHeight = this._toUnits(wallMinHeightMeters);
             if (Number.isFinite(wallMinHeight) && Math.abs(d) < wallMinHeight) continue;
             const target = d >= 0 ? wallIndicesFill : wallIndicesCut;
             target.push(topI, baseI, topJ);
@@ -646,9 +649,10 @@ export class TerrainEditor {
         // Back-compat: constant high edge elevation (deprecated)
         const legacyConstant = Number(options?.highEdgeElevation);
         if (Number.isFinite(legacyConstant)) {
+            const legacyUnits = this._toUnits(legacyConstant);
             return [
-                { t: 0, elevation: legacyConstant },
-                { t: 1, elevation: legacyConstant }
+                { t: 0, elevation: legacyUnits },
+                { t: 1, elevation: legacyUnits }
             ];
         }
 
@@ -678,16 +682,18 @@ export class TerrainEditor {
             if (!Array.isArray(item)) continue;
             if (item.length === 2) {
                 const t = toNum(item[0]);
-                const elevation = toNum(item[1]);
-                if (!Number.isFinite(t) || !Number.isFinite(elevation)) continue;
+                const elevationMeters = toNum(item[1]);
+                if (!Number.isFinite(t) || !Number.isFinite(elevationMeters)) continue;
+                const elevation = this._toUnits(elevationMeters);
                 samples.push({ t: Math.min(1, Math.max(0, t)), elevation });
                 continue;
             }
             if (item.length >= 3) {
                 const lon = toNum(item[0]);
                 const lat = toNum(item[1]);
-                const elevation = toNum(item[2]);
-                if (!Number.isFinite(lon) || !Number.isFinite(lat) || !Number.isFinite(elevation)) continue;
+                const elevationMeters = toNum(item[2]);
+                if (!Number.isFinite(lon) || !Number.isFinite(lat) || !Number.isFinite(elevationMeters)) continue;
+                const elevation = this._toUnits(elevationMeters);
 
                 // Convert lon/lat to world XZ, then project onto AB to get t
                 const p = this.terrain.proj.lonLatToThree(lon, lat);

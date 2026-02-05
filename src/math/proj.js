@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SCENE_UNITS_PER_METER } from './scale.js';
 
 /**
  * 坐标转换工具类
@@ -38,6 +39,7 @@ export class MathProj {
             ...options,
             centerLon: toFiniteOr(options?.centerLon, 0),
             centerLat: toFiniteOr(options?.centerLat, 0),
+            unitsPerMeter: toFiniteOr(options?.unitsPerMeter, SCENE_UNITS_PER_METER),
             earthRadius: toFiniteOr(options?.earthRadius, 6378137.0), // WGS84椭球长半轴，Web Mercator投影标准半径
             geodeticRadius: toFiniteOr(options?.geodeticRadius, 6371000.0) // 地球平均半径，用于测地距离计算
         };
@@ -46,8 +48,55 @@ export class MathProj {
         this.earthRadius = this.options.earthRadius;
         this.geodeticRadius = this.options.geodeticRadius;
 
+        // 全局比例（Three units / meter）
+        this.unitsPerMeter = toFiniteOr(this.options.unitsPerMeter, SCENE_UNITS_PER_METER);
+        this.unitsPerMeter = toFiniteOr(this.options.unitsPerMeter, SCENE_UNITS_PER_METER);
+        this.metersPerUnit = this.unitsPerMeter !== 0 ? (1 / this.unitsPerMeter) : 1;
+
         // 计算场景中心的Web墨卡托坐标
         this.centerMercator = this.lonLatToMercator(this.options.centerLon, this.options.centerLat);
+    }
+
+    // ===================== Scale (meters <-> three units) =====================
+
+    metersToUnits(value) {
+        const v = Number(value);
+        if (!Number.isFinite(v)) return 0;
+        return v * this.unitsPerMeter;
+    }
+
+    unitsToMeters(value) {
+        const v = Number(value);
+        if (!Number.isFinite(v)) return 0;
+        return v * this.metersPerUnit;
+    }
+
+    meters2ToUnits2(value) {
+        const v = Number(value);
+        if (!Number.isFinite(v)) return 0;
+        const k = this.unitsPerMeter * this.unitsPerMeter;
+        return v * k;
+    }
+
+    units2ToMeters2(value) {
+        const v = Number(value);
+        if (!Number.isFinite(v)) return 0;
+        const k = this.unitsPerMeter * this.unitsPerMeter;
+        return k !== 0 ? v / k : 0;
+    }
+
+    meters3ToUnits3(value) {
+        const v = Number(value);
+        if (!Number.isFinite(v)) return 0;
+        const k = this.unitsPerMeter * this.unitsPerMeter * this.unitsPerMeter;
+        return v * k;
+    }
+
+    units3ToMeters3(value) {
+        const v = Number(value);
+        if (!Number.isFinite(v)) return 0;
+        const k = this.unitsPerMeter * this.unitsPerMeter * this.unitsPerMeter;
+        return k !== 0 ? v / k : 0;
     }
 
     // ===================== 基础数学工具 =====================
@@ -133,7 +182,8 @@ export class MathProj {
         // 注意：Web墨卡托Y正方向是北，因此需要取反来满足 -Z 指北
         const threeZ = this.centerMercator.y - mercatorY; // 南 → +Z
 
-        return new THREE.Vector3(threeX, mercatorZ, threeZ);
+        const scale = this.unitsPerMeter;
+        return new THREE.Vector3(threeX * scale, Number(mercatorZ) * scale, threeZ * scale);
     }
 
     /**
@@ -171,7 +221,10 @@ export class MathProj {
         // 严格按照逆运算计算
         const mercatorX = threeX + this.centerMercator.x; // +X → 东
         const mercatorY = this.centerMercator.y - threeZ; // +Z → 南，-Z → 北
-        return { x: mercatorX, y: mercatorY, z: threeY };
+        const scale = this.metersPerUnit;
+        const mercatorXScaled = threeX * scale + this.centerMercator.x;
+        const mercatorYScaled = this.centerMercator.y - threeZ * scale;
+        return { x: mercatorXScaled, y: mercatorYScaled, z: threeY * scale };
     }
 
     // ===================== 经纬度 ↔ Three.js场景坐标 =====================
@@ -394,7 +447,7 @@ export class MathProj {
         const p1 = point1 instanceof THREE.Vector3 ? point1 : new THREE.Vector3(point1.x, point1.y, point1.z);
         const p2 = point2 instanceof THREE.Vector3 ? point2 : new THREE.Vector3(point2.x, point2.y, point2.z);
 
-        return p1.distanceTo(p2);
+        return this.unitsToMeters(p1.distanceTo(p2));
     }
 
     /**
@@ -428,8 +481,8 @@ export class MathProj {
         const lonLat2 = this.threeToLonLat(p2);
 
         // Three direction components
-        const eastThree = p2.x - p1.x;
-        const northThree = -(p2.z - p1.z);
+        const eastThree = this.unitsToMeters(p2.x - p1.x);
+        const northThree = this.unitsToMeters(-(p2.z - p1.z));
 
         // Geodesic signed components (approx: project to same-lat / same-lon legs)
         const eastAbs = this.calculateGeographicDistance(

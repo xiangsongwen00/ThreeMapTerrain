@@ -323,10 +323,12 @@ export class MeasureToolUI {
             // 1. 计算投影距离（水平面投影的距离）
             const point1Proj = new THREE.Vector3(point1.three.x, 0, point1.three.z);
             const point2Proj = new THREE.Vector3(point2.three.x, 0, point2.three.z);
-            const projectionDistance = point1Proj.distanceTo(point2Proj);
+            const projectionDistanceUnits = point1Proj.distanceTo(point2Proj);
+            const projectionDistance = this.mathProj?.unitsToMeters ? this.mathProj.unitsToMeters(projectionDistanceUnits) : projectionDistanceUnits;
 
             // 2. 计算贴地Three距离（Three场景中的贴地距离）
-            const groundThreeDistance = MeasureMath.calculateGroundDistance(point1.three, point2.three, this.rgbTerrain);
+            const groundThreeDistanceUnits = MeasureMath.calculateGroundDistance(point1.three, point2.three, this.rgbTerrain);
+            const groundThreeDistance = this.mathProj?.unitsToMeters ? this.mathProj.unitsToMeters(groundThreeDistanceUnits) : groundThreeDistanceUnits;
 
             // 3. 计算贴地测地距离（测地坐标系中的距离）
             const groundGeodesicDistance = this.mathProj.calculateGeographicDistance(point1.lonLat, point2.lonLat);
@@ -427,9 +429,11 @@ export class MeasureToolUI {
         // 2. 计算贴地面积
         // 2.1 Three贴地面积（考虑地形起伏）
         const threeTerrainArea = MeasureMath.calculateTerrainArea(points, this.rgbTerrain);
+        const horizontal3857AreaM2 = this.mathProj?.units2ToMeters2 ? this.mathProj.units2ToMeters2(horizontal3857Area) : horizontal3857Area;
+        const threeTerrainAreaM2 = this.mathProj?.units2ToMeters2 ? this.mathProj.units2ToMeters2(threeTerrainArea) : threeTerrainArea;
         
         // 2.2 3857贴地面积（简化处理，使用Three贴地面积）
-        const ground3857Area = threeTerrainArea;
+        const ground3857Area = threeTerrainAreaM2;
         
         // 2.3 测地贴地面积（简化处理，使用测地投影面积）
         const groundGeodesicArea = horizontalGeodesicArea;
@@ -460,19 +464,22 @@ export class MeasureToolUI {
             geodesicPerimeter += this.mathProj.calculateGeographicDistance(point1.lonLat, point2.lonLat);
         }
 
+        const projectionPerimeterM = this.mathProj?.unitsToMeters ? this.mathProj.unitsToMeters(projectionPerimeter) : projectionPerimeter;
+        const threePerimeterM = this.mathProj?.unitsToMeters ? this.mathProj.unitsToMeters(threePerimeter) : threePerimeter;
+
         // 更新UI
         // 投影面积
-        horizontal3857AreaEl.textContent = `${horizontal3857Area.toFixed(2)} 平方米`;
+        horizontal3857AreaEl.textContent = `${horizontal3857AreaM2.toFixed(2)} 平方米`;
         horizontalGeodesicAreaEl.textContent = `${horizontalGeodesicArea.toFixed(2)} 平方米`;
         
         // 贴地面积
         ground3857AreaEl.textContent = `${ground3857Area.toFixed(2)} 平方米`;
-        threeTerrainAreaEl.textContent = `${threeTerrainArea.toFixed(2)} 平方米`;
+        threeTerrainAreaEl.textContent = `${threeTerrainAreaM2.toFixed(2)} 平方米`;
         groundGeodesicAreaEl.textContent = `${groundGeodesicArea.toFixed(2)} 平方米`;
         
         // 周长
-        projectionPerimeterEl.textContent = `${projectionPerimeter.toFixed(2)} 米`;
-        threePerimeterEl.textContent = `${threePerimeter.toFixed(2)} 米`;
+        projectionPerimeterEl.textContent = `${projectionPerimeterM.toFixed(2)} 米`;
+        threePerimeterEl.textContent = `${threePerimeterM.toFixed(2)} 米`;
         geodesicPerimeterEl.textContent = `${geodesicPerimeter.toFixed(2)} 米`;
     }
 
@@ -747,8 +754,9 @@ export class MeasureToolUI {
         if (!this.mathProj) return out;
         if (!this.cutFillPolygons.length) return out;
 
-        const target = Number.isFinite(Number(this.cutFillTargetElevation)) ? Number(this.cutFillTargetElevation) : 0;
+        const targetMeters = Number.isFinite(Number(this.cutFillTargetElevation)) ? Number(this.cutFillTargetElevation) : 0;
         const stepM = Number.isFinite(Number(this.cutFillSampleStepMeters)) ? Math.max(1, Number(this.cutFillSampleStepMeters)) : 20;
+        const target = this.mathProj?.metersToUnits ? this.mathProj.metersToUnits(targetMeters) : targetMeters;
 
         const getTerrainY = (x, z) => {
             try {
@@ -821,7 +829,8 @@ export class MeasureToolUI {
                         const area = this._cutFillTriangleGeodesicArea(a.x, a.z, b.x, b.z, c.x, c.z);
                         if (!Number.isFinite(area) || area <= 0) continue;
 
-                        const avgD = (a.d + b.d + c.d) / 3;
+                        const avgDUnits = (a.d + b.d + c.d) / 3;
+                        const avgD = this.mathProj?.unitsToMeters ? this.mathProj.unitsToMeters(avgDUnits) : avgDUnits;
                         if (part.sign > 0) out.cutM3 += area * Math.max(0, avgD);
                         else if (part.sign < 0) out.fillM3 += area * Math.max(0, -avgD);
 
@@ -927,7 +936,8 @@ export class MeasureToolUI {
             d(bx, bz, cx, cz),
             d(cx, cz, ax, az)
         );
-        const n0 = Math.max(1, Math.ceil(maxLen / Math.max(1, stepMeters)));
+        const stepUnits = this.mathProj?.metersToUnits ? this.mathProj.metersToUnits(stepMeters) : stepMeters;
+        const n0 = Math.max(1, Math.ceil(maxLen / Math.max(1, stepUnits)));
         const n = Math.min(48, n0); // safety clamp
 
         const tris = [];
@@ -1090,7 +1100,8 @@ export class MeasureToolUI {
         const endPoint = points[1].three;
         
         // 计算剖面长度
-        const length = startPoint.distanceTo(endPoint);
+        const lengthUnits = startPoint.distanceTo(endPoint);
+        const length = this.mathProj?.unitsToMeters ? this.mathProj.unitsToMeters(lengthUnits) : lengthUnits;
         
         // 生成剖面数据（简化实现，实际应根据地形数据生成更密集的剖面点）
         const profileData = MeasureMath.generateProfileData(startPoint, endPoint, 40, this.rgbTerrain, this.mathProj);
@@ -1830,7 +1841,8 @@ export class MeasureToolUI {
         if (!point1 || !point2) return;
 
         // 计算Three.js距离
-        const threeDistance = point1.three.distanceTo(point2.three);
+        const threeDistanceUnits = point1.three.distanceTo(point2.three);
+        const threeDistance = this.mathProj?.unitsToMeters ? this.mathProj.unitsToMeters(threeDistanceUnits) : threeDistanceUnits;
 
         // 计算3857距离
         const mercatorDistance = Math.sqrt(
@@ -1891,7 +1903,8 @@ export class MeasureToolUI {
         setTextIfExists('northGeodesicDistance', `${toFiniteNum(directionDistances?.north?.geodesicsigned).toFixed(2)} 米`);
 
         // 更新UI - 高度分量
-        const heightDiff = point2.three.y - point1.three.y;
+        const heightDiffUnits = point2.three.y - point1.three.y;
+        const heightDiff = this.mathProj?.unitsToMeters ? this.mathProj.unitsToMeters(heightDiffUnits) : heightDiffUnits;
         setTextIfExists('heightDifference', `${toFiniteNum(heightDiff).toFixed(2)} 米`);
     }
 

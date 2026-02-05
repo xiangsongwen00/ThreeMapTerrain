@@ -50,13 +50,15 @@ export class CustomTerrainSurface {
         });
         this._maskMaterial.toneMapped = false;
 
+        const toUnits = (v) => (this.terrain?.proj?.metersToUnits ? this.terrain.proj.metersToUnits(v) : Number(v));
+
         // Mask quality controls (affects edge jaggies).
         // - metersPerPixel: smaller = higher resolution edges
         // - maxSize: clamp for GPU/memory safety
         // - samples: MSAA samples for the mask RT (WebGL2). Falls back silently if unsupported.
         this._maskMetersPerPixel = Number.isFinite(Number(options.maskMetersPerPixel))
-            ? Math.max(0.05, Number(options.maskMetersPerPixel))
-            : 0.25;
+            ? Math.max(toUnits(0.05), toUnits(Number(options.maskMetersPerPixel)))
+            : toUnits(0.25);
         this._maskMaxSize = Number.isFinite(Number(options.maskMaxSize))
             ? Math.max(256, Number(options.maskMaxSize) | 0)
             : 4096;

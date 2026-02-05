@@ -184,14 +184,14 @@ export class MeasureMath {
             const point = startPoint.clone().add(step.clone().multiplyScalar(i));
             
             // 计算到起点的距离
-            const distance = startPoint.distanceTo(point);
+            const distanceUnits = startPoint.distanceTo(point);
             
             // 获取海拔高度（实际应从地形数据中获取，这里简化处理）
-            let elevation = point.y;
+            let elevationUnits = point.y;
             
             // 如果有rgbTerrain，尝试获取更精确的海拔
             if (rgbTerrain) {
-                elevation = rgbTerrain.getElevationAtThreePosition(point.x, point.z) || point.y;
+                elevationUnits = rgbTerrain.getElevationAtThreePosition(point.x, point.z) || point.y;
             }
             
             // 添加经纬度信息
@@ -200,9 +200,12 @@ export class MeasureMath {
                 lonLat = mathProj.threeToLonLat(point);
             }
             
+            const distance = mathProj?.unitsToMeters ? mathProj.unitsToMeters(distanceUnits) : distanceUnits;
+            const elevation = mathProj?.unitsToMeters ? mathProj.unitsToMeters(elevationUnits) : elevationUnits;
+
             profileData.push({
-                distance: distance,
-                elevation: elevation,
+                distance,
+                elevation,
                 x: point.x,
                 y: point.y,
                 z: point.z,

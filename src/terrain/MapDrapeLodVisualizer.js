@@ -67,7 +67,9 @@ export class MapDrapeLodVisualizer {
         if (!proj || !byZoom || !byZoom.size) return;
 
         const cfg = terrain?.config || {};
-        const heightOffset = Number.isFinite(cfg.mapDrapeLodVizHeightOffset) ? Number(cfg.mapDrapeLodVizHeightOffset) : 2;
+        const toUnits = (v) => (proj?.metersToUnits ? proj.metersToUnits(v) : Number(v));
+        const heightOffsetMeters = Number.isFinite(cfg.mapDrapeLodVizHeightOffset) ? Number(cfg.mapDrapeLodVizHeightOffset) : 2;
+        const heightOffset = toUnits(heightOffsetMeters);
         const maxTiles = Number.isFinite(cfg.mapDrapeLodVizMaxTiles) ? Math.max(0, cfg.mapDrapeLodVizMaxTiles | 0) : 5000;
         const showViewQuad = cfg.mapDrapeLodVizShowViewQuad !== false;
 
@@ -126,10 +128,10 @@ export class MapDrapeLodVisualizer {
                 const south = Number(b.max.y);
                 if (!Number.isFinite(west) || !Number.isFinite(north) || !Number.isFinite(east) || !Number.isFinite(south)) continue;
 
-                const xW = west - cx;
-                const xE = east - cx;
-                const zN = cy - north;
-                const zS = cy - south;
+                const xW = toUnits(west - cx);
+                const xE = toUnits(east - cx);
+                const zN = toUnits(cy - north);
+                const zS = toUnits(cy - south);
 
                 // 4 edges => 8 vertices
                 positions[out++] = xW; positions[out++] = baseY; positions[out++] = zN;
@@ -200,10 +202,11 @@ export class MapDrapeLodVisualizer {
         const proj = terrain?.proj;
         if (!proj?.centerMercator) return;
 
+        const toUnits = (v) => (proj?.metersToUnits ? proj.metersToUnits(v) : Number(v));
         const planeBelowGroundCfg = Number.isFinite(terrain?.config?.mapDrapeViewportPlaneBelowGroundMeters)
             ? Math.max(0, Number(terrain.config.mapDrapeViewportPlaneBelowGroundMeters))
             : null;
-        const planeBelowGround = planeBelowGroundCfg !== null ? planeBelowGroundCfg : 0;
+        const planeBelowGround = planeBelowGroundCfg !== null ? toUnits(planeBelowGroundCfg) : 0;
         const planeY = Number(groundY) - planeBelowGround;
 
         const terrainGroup = terrain?.terrainGroup;

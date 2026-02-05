@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 // 导入坐标转换工具
 import { getMathProj } from '../math/proj.js';
+import { SCENE_UNITS_PER_METER, metersToUnits } from '../math/scale.js';
 
 // 导入工具UI类
 import { MeasureToolUI } from './UI/measureToolUI.js';
@@ -539,7 +540,9 @@ export class ToolManager {
                     // 处理相机重置
                     if (this.options.camera && this.options.controls) {
                         console.log('重置相机');
-                        this.options.camera.position.set(0, 500, 1000);
+                        const y = metersToUnits(500, SCENE_UNITS_PER_METER);
+                        const z = metersToUnits(1000, SCENE_UNITS_PER_METER);
+                        this.options.camera.position.set(0, y, z);
                         this.options.camera.lookAt(0, 0, 0);
                         this.options.controls.target.set(0, 0, 0);
                         this.options.controls.update();

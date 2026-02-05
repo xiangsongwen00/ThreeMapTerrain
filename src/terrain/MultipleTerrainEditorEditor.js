@@ -5,6 +5,7 @@ export class MultipleTerrainEditorEditor {
     constructor(terrain) {
         this.terrain = terrain;
         this.editor = terrain?.editor;
+        this._toUnits = (v) => this.terrain?.proj?.metersToUnits ? this.terrain.proj.metersToUnits(v) : Number(v);
 
         this._lastDelta = 0;
         this._lastFlatten = 0;
@@ -94,7 +95,7 @@ export class MultipleTerrainEditorEditor {
 
             const boundaryPolygonXZ = this.editor._buildBoundaryXZ(polygon);
             const polygonKey = JSON.stringify({ type: 'delta', i, polygon });
-            const editState = { polygonKey, mode: 'delta', value: last };
+            const editState = { polygonKey, mode: 'delta', value: this._toUnits(last) };
             const patchKey = `${prefix}${i}`;
             this.editor.createOrUpdateEditPatch(boundaryPolygonXZ, editState, patchKey);
         }
@@ -132,7 +133,7 @@ export class MultipleTerrainEditorEditor {
 
             const boundaryPolygonXZ = this.editor._buildBoundaryXZ(polygon);
             const polygonKey = JSON.stringify({ type: 'flatten', i, polygon });
-            const editState = { polygonKey, mode: 'flatten', value: last };
+            const editState = { polygonKey, mode: 'flatten', value: this._toUnits(last) };
             const patchKey = `${prefix}${i}`;
             this.editor.createOrUpdateEditPatch(boundaryPolygonXZ, editState, patchKey);
         }

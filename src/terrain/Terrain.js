@@ -235,6 +235,23 @@ export class Terrain {
         this.multipleEditor = new MultipleTerrainEditorEditor(this);
     }
 
+    metersToUnits(value) {
+        return this.proj?.metersToUnits ? this.proj.metersToUnits(value) : Number(value);
+    }
+
+    unitsToMeters(value) {
+        return this.proj?.unitsToMeters ? this.proj.unitsToMeters(value) : Number(value);
+    }
+
+    _scaleHeightmapInPlace(heightmap, scale) {
+        const s = Number(scale);
+        if (!heightmap || !Number.isFinite(s) || s === 1) return heightmap;
+        for (let i = 0; i < heightmap.length; i++) {
+            heightmap[i] = heightmap[i] * s;
+        }
+        return heightmap;
+    }
+
     /**
      * 
      */
@@ -452,14 +469,17 @@ export class Terrain {
         const tileBounds = this.proj.tileToMercatorBounds(tileX, tileY, tileZ);
 
         // 2) Tile size in meters (WebMercator).
-        const tileWidth = Math.abs(tileBounds.max.x - tileBounds.min.x);
-        const tileHeight = Math.abs(tileBounds.max.y - tileBounds.min.y);
+        const tileWidthMeters = Math.abs(tileBounds.max.x - tileBounds.min.x);
+        const tileHeightMeters = Math.abs(tileBounds.max.y - tileBounds.min.y);
+        const tileWidth = this.metersToUnits(tileWidthMeters);
+        const tileHeight = this.metersToUnits(tileHeightMeters);
 
         // 3) Plane geometry in tile local space.
         const geometry = new THREE.PlaneGeometry(tileWidth, tileHeight, segments, segments);
 
         // 4) Decode heightmap from Terrain-RGB.
         const heightmap = this.buildHeightmapFromTexture(texture, geometry, tileBounds);
+        this._scaleHeightmapInPlace(heightmap, this.proj?.unitsPerMeter ?? 1);
         this.applyHeightmapToGeometry(geometry, heightmap);
         geometry.computeVertexNormals();
         geometry.computeBoundingBox();
@@ -552,7 +572,7 @@ export class Terrain {
         if ((this.config?.terrainDebugLogs ?? false) && !options.dynamic) {
             console.log('=== Terrain tile created ===');
             console.log('Tile coords:', tileX, tileY, tileZ);
-            console.log('Tile size (meters):', tileWidth, tileHeight);
+            console.log('Tile size (meters):', tileWidthMeters, tileHeightMeters);
             console.log('[Terrain]');
             console.log('[Terrain]');
             console.log('====================');
@@ -591,10 +611,10 @@ export class Terrain {
             const cx = this.proj.centerMercator.x;
             const cy = this.proj.centerMercator.y;
             tile.boundsThree = {
-                minX: tileBounds.min.x - cx,
-                maxX: tileBounds.max.x - cx,
-                minZ: cy - tileBounds.max.y,
-                maxZ: cy - tileBounds.min.y
+                minX: this.metersToUnits(tileBounds.min.x - cx),
+                maxX: this.metersToUnits(tileBounds.max.x - cx),
+                minZ: this.metersToUnits(cy - tileBounds.max.y),
+                maxZ: this.metersToUnits(cy - tileBounds.min.y)
             };
         }
         this.tileMap.set(tileKey, tile);
@@ -988,8 +1008,10 @@ export class Terrain {
         const positions = geometry.attributes.position.array;
         const heightmap = new Float32Array(positions.length / 3);
 
-        const tileWidth = Math.abs(tileBounds.max.x - tileBounds.min.x);
-        const tileHeight = Math.abs(tileBounds.max.y - tileBounds.min.y);
+        const tileWidthMeters = Math.abs(tileBounds.max.x - tileBounds.min.x);
+        const tileHeightMeters = Math.abs(tileBounds.max.y - tileBounds.min.y);
+        const tileWidth = this.metersToUnits(tileWidthMeters);
+        const tileHeight = this.metersToUnits(tileHeightMeters);
 
         for (let i = 0, v = 0; i < positions.length; i += 3, v++) {
             const x = positions[i];
@@ -1656,7 +1678,8 @@ export class Terrain {
             const boundingBox = new THREE.Box3().setFromObject(child);
             if (x >= boundingBox.min.x && x <= boundingBox.max.x && z >= boundingBox.min.z && z <= boundingBox.max.z) {
                 const raycaster = new THREE.Raycaster();
-                raycaster.set(new THREE.Vector3(x, 10000, z), new THREE.Vector3(0, -1, 0));
+                const rayH = this.metersToUnits(10000);
+                raycaster.set(new THREE.Vector3(x, rayH, z), new THREE.Vector3(0, -1, 0));
                 const intersects = raycaster.intersectObject(child);
                 if (intersects.length > 0) {
                     elevation = intersects[0].point.y;

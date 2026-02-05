@@ -10,6 +10,7 @@
  */
 import * as THREE from 'three';
 import { IMG } from '../assets/img/urls.js';
+import { SCENE_UNITS_PER_METER, metersToUnits } from '../math/scale.js';
 
 /**
  * 点标记工具类
@@ -20,12 +21,69 @@ export class MarkerManager {
      * 构造函数
      * @param {THREE.Scene} scene - Three.js场景
      */
-    constructor(scene) {
+    constructor(scene, options = {}) {
         this.scene = scene;
         this.markers = new Map(); // 存储所有标记点
         this.nextId = 0; // 标记点ID计数器
         this.markerGroup = new THREE.Group(); // 标记点分组
         scene.add(this.markerGroup);
+
+        this.unitsPerMeter = Number(options.unitsPerMeter ?? SCENE_UNITS_PER_METER);
+        this.autoScale = options.autoScale !== undefined ? !!options.autoScale : true;
+        this.screenSizePx = Number.isFinite(Number(options.screenSizePx)) ? Number(options.screenSizePx) : 8;
+        this.labelSizePx = Number.isFinite(Number(options.labelSizePx)) ? Number(options.labelSizePx) : 30;
+    }
+
+    _unitsPerPixel(camera, renderer, distance) {
+        if (!camera || !renderer) return null;
+        const h = renderer.domElement?.clientHeight
+            ?? renderer.getSize?.(new THREE.Vector2())?.y
+            ?? 0;
+        if (!Number.isFinite(h) || h <= 0) return null;
+
+        if (camera.isOrthographicCamera === true) {
+            const frustumH = Math.abs(Number(camera.top) - Number(camera.bottom));
+            return Number.isFinite(frustumH) && frustumH > 0 ? (frustumH / h) : null;
+        }
+
+        const fovDeg = Number(camera.fov);
+        const fov = THREE.MathUtils.degToRad(Number.isFinite(fovDeg) ? fovDeg : 60);
+        if (!Number.isFinite(fov) || fov <= 0) return null;
+        return (2 * distance * Math.tan(fov / 2)) / h;
+    }
+
+    update(camera, renderer) {
+        if (!camera || !renderer) return;
+        if (!this.markers?.size) return;
+
+        for (const marker of this.markers.values()) {
+            const data = marker?.userData?.markerData;
+            if (!data?.sphere) continue;
+
+            const pos = marker.position;
+            const dist = (camera.isOrthographicCamera === true)
+                ? 1
+                : (camera.position?.distanceTo?.(pos) ?? 1);
+
+            const unitsPerPixel = this._unitsPerPixel(camera, renderer, dist);
+            if (!Number.isFinite(unitsPerPixel) || unitsPerPixel <= 0) continue;
+
+            const baseRadius = Math.max(1e-6, Number(data.baseRadiusUnits ?? 1));
+            const px = Number(data.screenSizePx ?? this.screenSizePx) || this.screenSizePx;
+            const desiredRadius = 0.5 * px * unitsPerPixel;
+            const radius = data.autoScale ? Math.max(baseRadius, desiredRadius) : baseRadius;
+            data.sphere.scale.setScalar(radius);
+
+            if (data.labelSprite) {
+                const labelPx = Number(data.labelSizePx ?? px) || px;
+                const baseSize = Math.max(1e-6, Number(data.baseLabelSizeUnits ?? (baseRadius * 2)));
+                const desiredSize = labelPx * unitsPerPixel;
+                const size = data.autoScale ? Math.max(baseSize, desiredSize) : baseSize;
+                data.labelSprite.scale.set(size, size, 1);
+                const offsetBase = Number(data.labelOffsetUnits ?? 0);
+                data.labelSprite.position.set(0, offsetBase + radius, 0);
+            }
+        }
     }
 
     /**
@@ -42,20 +100,42 @@ export class MarkerManager {
      */
     createMarker(options) {
         const { x, y, z, radius = 5, color = 0xff0000, label = '', img = '' } = options;
+        const unitsPerMeter = Number(options.unitsPerMeter ?? this.unitsPerMeter ?? SCENE_UNITS_PER_METER);
+        const baseRadiusMeters = Number.isFinite(Number(radius)) ? Number(radius) : 1;
+        const baseRadiusUnits = Math.max(1e-6, metersToUnits(baseRadiusMeters, unitsPerMeter));
+        const autoScale = options.autoScale !== undefined ? !!options.autoScale : this.autoScale;
+        const screenSizePx = Number.isFinite(Number(options.screenSizePx)) ? Number(options.screenSizePx) : this.screenSizePx;
+        const labelOffsetMeters = Number.isFinite(Number(options.labelOffsetMeters)) ? Number(options.labelOffsetMeters) : 5;
+        const labelOffsetUnits = metersToUnits(labelOffsetMeters, unitsPerMeter);
+        const labelSizePx = Number.isFinite(Number(options.labelSizePx)) ? Number(options.labelSizePx) : (this.labelSizePx ?? screenSizePx);
+        const baseLabelSizeMeters = Number.isFinite(Number(options.labelSizeMeters)) ? Number(options.labelSizeMeters) : (baseRadiusMeters * 2);
+        const baseLabelSizeUnits = Math.max(1e-6, metersToUnits(baseLabelSizeMeters, unitsPerMeter));
         const id = `marker_${this.nextId++}`;
 
         // 创建标记点组
         const markerGroup = new THREE.Group();
         markerGroup.name = id;
         markerGroup.userData.id = id;
+        markerGroup.position.set(Number(x) || 0, Number(y) || 0, Number(z) || 0);
 
         // 创建球体几何体（始终创建）
-        const geometry = new THREE.SphereGeometry(radius, 25, 25);
+        const geometry = new THREE.SphereGeometry(1, 25, 25);
         const material = new THREE.MeshBasicMaterial({ color: color });
         const sphere = new THREE.Mesh(geometry, material);
         sphere.name = id;
-        sphere.position.set(x, y, z);
+        sphere.position.set(0, 0, 0);
+        sphere.scale.setScalar(baseRadiusUnits);
         markerGroup.add(sphere);
+
+        markerGroup.userData.markerData = {
+            sphere,
+            baseRadiusUnits,
+            autoScale,
+            screenSizePx,
+            labelOffsetUnits,
+            labelSizePx,
+            baseLabelSizeUnits
+        };
 
         // 如果提供了图片路径，创建图片标签并显示在球体上方
         if (img) {
@@ -104,13 +184,13 @@ export class MarkerManager {
             const imgLabel = new THREE.Sprite(spriteMaterial);
             imgLabel.name = id;
             // 将图片标签放在球体上方
-            imgLabel.position.set(x, y + 5, z);
+            imgLabel.position.set(0, labelOffsetUnits + baseRadiusUnits, 0);
             
             // 设置固定像素大小为10px
-            const pixelSize = 8;
-            imgLabel.scale.set(pixelSize, pixelSize, 1);
+            imgLabel.scale.set(baseLabelSizeUnits, baseLabelSizeUnits, 1);
             
             markerGroup.add(imgLabel);
+            if (markerGroup.userData.markerData) markerGroup.userData.markerData.labelSprite = imgLabel;
         }
 
         // 添加到场景和标记点列表
@@ -170,11 +250,13 @@ export class MarkerManager {
             // 设置固定像素大小
             const pixelSize = 12; // 像素大小
             sprite.position.set(x, y, z);
-            sprite.scale.set(pixelSize, pixelSize, 1);
+            const baseSizeUnits = Math.max(1e-6, Number(parent?.userData?.markerData?.baseLabelSizeUnits ?? pixelSize));
+            sprite.scale.set(baseSizeUnits, baseSizeUnits, 1);
             
             // 添加到父对象
             parent.add(sprite);
             parent.userData.label = sprite;
+            if (parent.userData.markerData) parent.userData.markerData.labelSprite = sprite;
         };
         
         // 加载图片
@@ -202,12 +284,16 @@ export class MarkerManager {
      */
     updateMarkerLabel(id, text) {
         const marker = this.markers.get(id);
-        if (marker && marker.userData.label) {
+        if (marker) {
             // 移除旧标签
-            marker.remove(marker.userData.label);
-            marker.userData.label = null;
+            if (marker.userData.label) {
+                marker.remove(marker.userData.label);
+                marker.userData.label = null;
+            }
             // 创建新标签
-            this.createLabel(marker, text, marker.position.x, marker.position.y + 15, marker.position.z);
+            const data = marker.userData.markerData;
+            const offset = data ? (data.labelOffsetUnits + data.baseRadiusUnits) : 15;
+            this.createLabel(marker, text, 0, offset, 0);
         }
     }
 
@@ -293,7 +379,7 @@ export class PointMarker {
         this.remove();
 
         // 创建新标记点
-        const geometry = new THREE.SphereGeometry(radius, 16, 16);
+        const geometry = new THREE.SphereGeometry(metersToUnits(radius, SCENE_UNITS_PER_METER), 16, 16);
         const material = new THREE.MeshBasicMaterial({ color: color });
         this.mesh = new THREE.Mesh(geometry, material);
         this.mesh.position.copy(position);

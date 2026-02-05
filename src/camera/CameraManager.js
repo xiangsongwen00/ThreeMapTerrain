@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { SCENE_UNITS_PER_METER, metersToUnits, unitsToMeters } from '../math/scale.js';
 
 /**
  * 相机管理器
@@ -12,6 +13,10 @@ export class CameraManager {
         this.scene = scene;
         this.camera = null;
         this.controls = null;
+
+        this.unitsPerMeter = SCENE_UNITS_PER_METER;
+        this.metersPerUnit = this.unitsPerMeter !== 0 ? (1 / this.unitsPerMeter) : 1;
+        this._toUnits = (v) => metersToUnits(v, this.unitsPerMeter);
 
         // 默认配置：适应 ~40km 城市场景，移除缩放限制相关的冗余配置
         this.config = {
@@ -26,6 +31,8 @@ export class CameraManager {
             rotateSpeed: 1.5,
             ...options
         };
+        this.config.near = this._toUnits(this.config.near);
+        this.config.far = this._toUnits(this.config.far);
 
         this._frustum = new THREE.Frustum();
         this._viewProj = new THREE.Matrix4();
@@ -48,7 +55,9 @@ export class CameraManager {
             this.config.far
         );
 
-        this.camera.position.set(0, 5000, 10000);
+        const posY = this._toUnits(5000);
+        const posZ = this._toUnits(10000);
+        this.camera.position.set(0, posY, posZ);
         this.camera.lookAt(0, 0, 0);
 
         this.controls = new OrbitControls(this.camera, this.container);
@@ -116,7 +125,7 @@ export class CameraManager {
 
     distanceTo(worldPoint) {
         if (!this.camera?.position || !worldPoint) return Infinity;
-        return this.camera.position.distanceTo(worldPoint);
+        return unitsToMeters(this.camera.position.distanceTo(worldPoint), this.unitsPerMeter);
     }
 
     _rayFromNdc(x, y) {
@@ -133,7 +142,10 @@ export class CameraManager {
         if (!cam) return null;
 
         const groundY = Number.isFinite(options.groundY) ? options.groundY : 0;
-        const maxDistance = Number.isFinite(options.maxDistance) ? options.maxDistance : (this.config?.far ?? 50000);
+        const maxDistanceMeters = Number.isFinite(options.maxDistance)
+            ? options.maxDistance
+            : unitsToMeters(this.config?.far ?? 50000, this.unitsPerMeter);
+        const maxDistance = this._toUnits(maxDistanceMeters);
 
         const corners = [
             [-1, -1], // bottom-left

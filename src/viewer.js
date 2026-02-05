@@ -1,5 +1,6 @@
 ﻿import * as THREE from 'three';
 import { initMathProj } from './math/proj.js';
+import { SCENE_UNITS_PER_METER, metersToUnits, unitsToMeters } from './math/scale.js';
 import { CameraManager } from './camera/CameraManager.js';
 import { Terrain } from './terrain/Terrain.js';
 import { AuxiliaryTools } from './utils/AuxiliaryTools.js';
@@ -80,12 +81,14 @@ export class Viewer {
 
         this.container.appendChild(this.renderer.domElement);
 
+        const toUnits = (v) => metersToUnits(v, SCENE_UNITS_PER_METER);
+
         // 添加灯光
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         this.scene.add(ambientLight);
 
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(500, 1000, 500);
+        directionalLight.position.set(toUnits(500), toUnits(1000), toUnits(500));
         this.scene.add(directionalLight);
 
         // 初始化相机管理器
@@ -95,14 +98,19 @@ export class Viewer {
 
         // 初始化辅助工具
         this.auxiliaryTools = new AuxiliaryTools(this.scene, {
-            gridSize: 40000,
+            gridSize: toUnits(40000),
             gridDivisions: 40,
-            axesSize: 5000
+            axesSize: toUnits(5000)
         });
-        this._axesSize = 5000;
+        this._axesSize = toUnits(5000);
 
         // Marker manager (used by measure/draw tools)
-        this.markerManager = new MarkerManager(this.scene);
+        this.markerManager = new MarkerManager(this.scene, {
+            unitsPerMeter: SCENE_UNITS_PER_METER,
+            autoScale: true,
+            screenSizePx: 8,
+            labelSizePx: 30
+        });
 
         // 创建坐标轴文字标签（使用 canvas sprite，中文不会变成 ?）
         this.createAxisLabels();
@@ -122,6 +130,9 @@ export class Viewer {
             centerLon: Number.isFinite(centerLon) ? centerLon : 0,
             centerLat: Number.isFinite(centerLat) ? centerLat : 0
         });
+        if (this.markerManager && this.proj?.unitsPerMeter) {
+            this.markerManager.unitsPerMeter = this.proj.unitsPerMeter;
+        }
     }
 
     /**
@@ -307,7 +318,8 @@ export class Viewer {
      */
     queryElevationByLonLat(lon, lat) {
         if (this.terrain) {
-            return this.terrain.getElevationAtLonLat(lon, lat);
+            const elevation = this.terrain.getElevationAtLonLat(lon, lat);
+            return this.proj?.unitsToMeters ? this.proj.unitsToMeters(elevation) : unitsToMeters(elevation, SCENE_UNITS_PER_METER);
         }
         return 0;
     }
@@ -323,7 +335,7 @@ export class Viewer {
             console.log(`Querying elevation at Three.js coordinates: (${x}, ${z})`);
             const elevation = this.terrain.getElevationAtThree(x, 0, z);
             console.log(`Query result: ${elevation}`);
-            return elevation;
+            return this.proj?.unitsToMeters ? this.proj.unitsToMeters(elevation) : unitsToMeters(elevation, SCENE_UNITS_PER_METER);
         }
         return 0;
     }
@@ -336,7 +348,8 @@ export class Viewer {
      */
     queryElevationByMercator(mercatorX, mercatorY) {
         if (this.terrain) {
-            return this.terrain.getElevationAtMercator(mercatorX, mercatorY);
+            const elevation = this.terrain.getElevationAtMercator(mercatorX, mercatorY);
+            return this.proj?.unitsToMeters ? this.proj.unitsToMeters(elevation) : unitsToMeters(elevation, SCENE_UNITS_PER_METER);
         }
         return 0;
     }
@@ -364,7 +377,8 @@ export class Viewer {
 
             if (intersects.length > 0) {
                 const intersect = intersects[0];
-                const elevation = intersect.point.y;
+                const elevationUnits = intersect.point.y;
+                const elevation = this.proj?.unitsToMeters ? this.proj.unitsToMeters(elevationUnits) : unitsToMeters(elevationUnits, SCENE_UNITS_PER_METER);
                 console.log('Picked elevation:', elevation);
 
                 // 触发高程拾取事件
@@ -600,9 +614,13 @@ export class Viewer {
 
     getRayTerrainIntersection(ray, options = {}) {
         if (!ray || !this.terrain || this.terrainVisible !== true) return null;
-        const maxDistance = Number.isFinite(options.maxDistance) ? Number(options.maxDistance) : 10000;
-        const step = Number.isFinite(options.step) ? Math.max(0.1, Number(options.step)) : 20;
-        const tolerance = Number.isFinite(options.tolerance) ? Math.max(0.001, Number(options.tolerance)) : 0.1;
+        const maxDistanceMeters = Number.isFinite(options.maxDistance) ? Number(options.maxDistance) : 10000;
+        const stepMeters = Number.isFinite(options.step) ? Math.max(0.1, Number(options.step)) : 20;
+        const toleranceMeters = Number.isFinite(options.tolerance) ? Math.max(0.001, Number(options.tolerance)) : 0.1;
+
+        const maxDistance = metersToUnits(maxDistanceMeters, SCENE_UNITS_PER_METER);
+        const step = metersToUnits(stepMeters, SCENE_UNITS_PER_METER);
+        const tolerance = metersToUnits(toleranceMeters, SCENE_UNITS_PER_METER);
 
         const origin = ray.origin;
         const dir = ray.direction;
@@ -850,6 +868,8 @@ export class Viewer {
 
         // 卫星影像（地形材质底图 + atlas shader 局部高清覆盖）
         this.terrain?.updateImagery?.(this.camera);
+
+        this.markerManager?.update?.(this.camera, this.renderer);
 
         this.renderer.render(this.scene, this.camera);
 
